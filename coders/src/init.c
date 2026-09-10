@@ -1,30 +1,12 @@
 /* ************************************************************************** */
 /*                                                                            */
 /*                                                        :::      ::::::::   */
-/*   log.c                                              :+:      :+:    :+:   */
+/*   init.c                                             :+:      :+:    :+:   */
 /*                                                    +:+ +:+         +:+     */
 /*   By: drakotov <drakotov@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
-/*   Created: 2026/08/19 01:47:15 by drakotov          #+#    #+#             */
-/*   Updated: 2026/08/19 02:15:00 by drakotov         ###   ########.fr       */
+/*   Created: 2026/08/19 02:26:55 by drakotov          #+#    #+#             */
+/*   Updated: 2026/08/19 02:26:56 by drakotov         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
-#include "codexion.h"
-
-void	log_event(t_sim *sim, int coder_num, const char *event)
-{
-	long	t;
-
-	t = now_ms() - sim->start;
-	if (t < 0)
-		t = 0;
-	pthread_mutex_lock(&sim->log_lock);
-	put_number(t);
-	put_string(" ");
-	put_number(coder_num);
-	put_string(" ");
-	put_string(event);
-	put_string("\n");
-	pthread_mutex_unlock(&sim->log_lock);
-}

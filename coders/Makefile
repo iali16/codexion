@@ -2,9 +2,19 @@ NAME	= codexion
 
 CC		= cc
 
-CFLAGS	= -Wall -Wextra -Werror -pthread -Icoders
+CFLAGS	= -Wall -Wextra -Werror -pthread -std=c89 -pedantic -Iinc
 
-SRCS	= coders/codexion.c
+SRCS	= main.c \
+		  output.c \
+		  time.c \
+		  log.c \
+		  parser.c \
+		  sim_utils.c \
+		  scheduler.c \
+		  dongle.c \
+		  coder.c \
+		  monitor.c \
+		  init.c
 
 OBJS	= $(SRCS:.c=.o)
 
@@ -13,7 +23,7 @@ all: $(NAME)
 $(NAME): $(OBJS)
 	$(CC) $(CFLAGS) -o $(NAME) $(OBJS)
 
-coders/%.o: coders/%.c coders/codexion.h
+%.o: %.c codexion.h
 	$(CC) $(CFLAGS) -c $< -o $@
 
 clean:

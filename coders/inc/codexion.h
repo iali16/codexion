@@ -6,7 +6,7 @@
 /*   By: drakotov <drakotov@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/08/19 00:10:10 by drakotov          #+#    #+#             */
-/*   Updated: 2026/08/19 02:11:47 by drakotov         ###   ########.fr       */
+/*   Updated: 2026/08/19 04:17:28 by drakotov         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -24,6 +24,16 @@
 # include <time.h>
 # include <unistd.h>
 
+typedef struct s_args
+{
+	long				n;
+	long				burnout;
+	long				compile;
+	long				debug;
+	long				refactor;
+	long				required;
+	long				cooldown;
+}						t_args;
 typedef enum e_sched
 {
 	SCHED_FIFO_CUSTOM,
@@ -97,28 +107,20 @@ struct					s_sim
 	long				seq_counter;
 };
 
-/* output.c */
+
 void					put_string(const char *s);
 void					put_number(long n);
 
-/* time.c */
 long					now_ms(void);
 void					ms_to_timespec(long ms, struct timespec *ts);
 
-/* log.c */
 void					log_event(t_sim *sim, int coder_num, const char *event);
 
-/* parser.c */
 int						parse_args(int argc, char **argv, t_sim *sim);
 
-/* sim_utils.c */
 int						sim_is_running(t_sim *sim);
 int						sleep_ms(t_sim *sim, long ms);
 
-/* scheduler.c */
-/* All heap functions are static - no prototypes needed */
-
-/* dongle.c */
 int						dongle_init(t_dongle *d, int id, int capacity,
 							t_sched sched, long start);
 void					dongle_destroy(t_dongle *d);
@@ -126,7 +128,6 @@ void					dongle_release(t_sim *sim, t_dongle *d);
 int						dongle_acquire(t_sim *sim, t_dongle *d, t_waiter *w);
 void					stop_dongles(t_sim *sim);
 
-/* coder.c */
 void					make_waiter(t_sim *sim, t_coder *coder, t_waiter *w);
 void					coder_release_two(t_sim *sim, t_coder *coder, int first,
 							int second);
@@ -134,10 +135,8 @@ int						coder_acquire_two(t_sim *sim, t_coder *coder,
 							int *first, int *second);
 void					*coder_routine(void *arg);
 
-/* monitor.c */
 void					*monitor_routine(void *arg);
 
-/* init.c */
 int						init_sim(t_sim *sim);
 void					cleanup_sim(t_sim *sim);
 
