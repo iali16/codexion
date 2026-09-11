@@ -43,7 +43,7 @@ The project demonstrates:
 | Component | Description |
 |-----------|-------------|
 | **Coders** | Developer threads that acquire dongles, compile, debug, and refactor |
-| **Dongles** | Limited resources (N) that coders compete for |
+| **Dongles** | Limited resources (n) that coders compete for |
 | **Monitor** | Watches for burnout conditions and stops simulation |
 | **Scheduler** | Manages dongle allocation (FIFO or EDF) |
 | **Logger** | Thread-safe event logging with timestamps |
@@ -191,23 +191,31 @@ diff fifo_output.txt edf_output.txt
 ## 📁 Project Structure
 
 ```
-codexion/
-├── Makefile                 # Build configuration
+.
 ├── README.md                # Documentation
-├── inc/                     # Header files directory
-│   └── codexion.h           # Main header file
-└── src/                     # Source files directory
-    ├── main.c               # Entry point
-    ├── output.c             # Output utilities
-    ├── time.c               # Time helpers
-    ├── log.c                # Logging functions
-    ├── parser.c             # Argument parsing
-    ├── sim_utils.c          # Simulation utilities
-    ├── scheduler.c          # Heap/priority queue operations
-    ├── dongle.c             # Dongle operations
-    ├── coder.c              # Coder routines
-    ├── monitor.c            # Monitor thread
-    └── init.c               # Initialization & cleanup
+└── coders/                  # Project directory
+    ├── Makefile             # Build configuration
+    ├── inc/                 # Header files directory
+    │   └── codexion.h       # Main header file
+    └── src/                 # Source files directory
+        ├── main.c           # Entry point
+        ├── parser.c         # Argument parsing
+        ├── output.c         # Output utilities
+        ├── time.c           # Time helpers
+        ├── log.c            # Logging functions
+        ├── sim_utils.c      # Simulation utilities
+        ├── sim_state.c      # Simulation state helpers
+        ├── init.c           # Initialization & cleanup
+        ├── dongle.c         # Dongle operations
+        ├── dongle_wait.c    # Dongle waiting queue
+        ├── heap.c           # Heap/priority queue operations
+        ├── scheduler.c      # Scheduling helpers
+        ├── coder.c          # Coder routines
+        ├── coder_acquire.c  # Dongle acquisition logic
+        ├── coder_cycle.c    # Compile/debug/refactor cycle
+        ├── monitor.c        # Monitor thread
+        ├── monitor_check.c  # Burnout and completion checks
+        └── threads.c        # Thread creation and joining
 ```
 
 ### File Descriptions
