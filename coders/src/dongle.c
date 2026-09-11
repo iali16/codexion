@@ -4,9 +4,9 @@
 /*   dongle.c                                           :+:      :+:    :+:   */
 /*                                                    +:+ +:+         +:+     */
 /*   By: drakotov <drakotov@student.42.fr>          +#+  +:+       +#+        */
-/*                                                +#+#+#+#+#+ +#+           */
+/*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/08/19 01:47:13 by drakotov          #+#    #+#             */
-/*   Updated: 2026/09/11 12:00:00 by drakotov         ###   ########.fr       */
+/*   Updated: 2026/09/11 22:46:33 by drakotov         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -26,7 +26,7 @@ int	dongle_init(t_dongle *d, t_sim *sim, int id)
 	d->sched = sim->sched;
 	if (pthread_mutex_init(&d->lock, NULL) != 0)
 		return (free(d->heap), 0);
-	if (sem_init(&d->wake_sem, 0, 0) != 0)
+	if (pthread_cond_init(&d->cond, NULL) != 0)
 	{
 		pthread_mutex_destroy(&d->lock);
 		free(d->heap);
@@ -38,7 +38,7 @@ int	dongle_init(t_dongle *d, t_sim *sim, int id)
 void	dongle_destroy(t_dongle *d)
 {
 	pthread_mutex_destroy(&d->lock);
-	sem_destroy(&d->wake_sem);
+	pthread_cond_destroy(&d->cond);
 	free(d->heap);
 	d->heap = NULL;
 }
@@ -48,8 +48,8 @@ void	dongle_release(t_sim *sim, t_dongle *d)
 	pthread_mutex_lock(&d->lock);
 	d->owner = -1;
 	d->available_at = now_ms() + sim->cooldown;
+	pthread_cond_broadcast(&d->cond);
 	pthread_mutex_unlock(&d->lock);
-	sem_post(&d->wake_sem);
 }
 
 void	stop_dongles(t_sim *sim)
@@ -61,8 +61,8 @@ void	stop_dongles(t_sim *sim)
 	{
 		pthread_mutex_lock(&sim->dongles[i].lock);
 		sim->dongles[i].stopped = 1;
+		pthread_cond_broadcast(&sim->dongles[i].cond);
 		pthread_mutex_unlock(&sim->dongles[i].lock);
-		sem_post(&sim->dongles[i].wake_sem);
 		i++;
 	}
 }

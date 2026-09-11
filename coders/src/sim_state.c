@@ -42,13 +42,20 @@ int	sim_is_running(t_sim *sim)
 
 int	sleep_ms(t_sim *sim, long ms)
 {
-	struct timespec	ts;
+	long	target;
+	long	remaining;
 
-	ms_to_timespec(ms, &ts);
-	while (nanosleep(&ts, &ts) == -1 && errno == EINTR)
+	target = now_ms() + ms;
+	while (1)
 	{
+		remaining = target - now_ms();
+		if (remaining <= 0)
+			break ;
 		if (!sim_is_running(sim))
 			return (-1);
+		if (remaining > 1000)
+			remaining = 1000;
+		usleep(remaining * 1000);
 	}
 	return (0);
 }
