@@ -27,7 +27,7 @@ int	dongle_init(t_dongle *d, int id, int capacity, t_sched sched,
 	d->sched = sched;
 	if (pthread_mutex_init(&d->lock, NULL) != 0)
 		return (free(d->heap), 0);
-	if (pthread_cond_init(&d->cond, NULL) != 0)
+	if (sem_init(&d->wake_sem, 0, 0) != 0)
 	{
 		pthread_mutex_destroy(&d->lock);
 		free(d->heap);
@@ -39,7 +39,7 @@ int	dongle_init(t_dongle *d, int id, int capacity, t_sched sched,
 void	dongle_destroy(t_dongle *d)
 {
 	pthread_mutex_destroy(&d->lock);
-	pthread_cond_destroy(&d->cond);
+	sem_destroy(&d->wake_sem);
 	free(d->heap);
 	d->heap = NULL;
 }
@@ -49,8 +49,8 @@ void	dongle_release(t_sim *sim, t_dongle *d)
 	pthread_mutex_lock(&d->lock);
 	d->owner = -1;
 	d->available_at = now_ms() + sim->cooldown;
-	pthread_cond_broadcast(&d->cond);
 	pthread_mutex_unlock(&d->lock);
+	sem_post(&d->wake_sem);
 }
 
 void	stop_dongles(t_sim *sim)
@@ -62,8 +62,8 @@ void	stop_dongles(t_sim *sim)
 	{
 		pthread_mutex_lock(&sim->dongles[i].lock);
 		sim->dongles[i].stopped = 1;
-		pthread_cond_broadcast(&sim->dongles[i].cond);
 		pthread_mutex_unlock(&sim->dongles[i].lock);
+		sem_post(&sim->dongles[i].wake_sem);
 		i++;
 	}
 }
@@ -88,11 +88,9 @@ int	dongle_acquire(t_sim *sim, t_dongle *d, t_waiter *w)
 {
 	struct timespec	ts;
 	int				ret;
-	int				stop_flag;
 
 	pthread_mutex_lock(&d->lock);
-	stop_flag = sim_get_stop_flag(sim);
-	if (d->stopped || stop_flag || d->size >= d->capacity)
+	if (d->stopped || sim_get_stop_flag(sim) || d->size >= d->capacity)
 	{
 		pthread_mutex_unlock(&d->lock);
 		return (-1);
@@ -105,9 +103,11 @@ int	dongle_acquire(t_sim *sim, t_dongle *d, t_waiter *w)
 			pthread_mutex_unlock(&d->lock);
 			return (0);
 		}
+		pthread_mutex_unlock(&d->lock);
 		ms_to_timespec(now_ms() + 1, &ts);
-		ret = pthread_cond_timedwait(&d->cond, &d->lock, &ts);
-		if (ret == ETIMEDOUT)
+		ret = sem_timedwait(&d->wake_sem, &ts);
+		pthread_mutex_lock(&d->lock);
+		if (ret != 0)
 			continue ;
 	}
 	if (w->in_heap)

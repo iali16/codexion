@@ -24,6 +24,7 @@
 # include <time.h>
 # include <unistd.h>
 # include <errno.h>
+# include <semaphore.h>
 
 typedef struct s_args
 {
@@ -65,7 +66,7 @@ struct					s_dongle
 {
 	int					id;
 	pthread_mutex_t		lock;
-	pthread_cond_t		cond;
+	sem_t				wake_sem;
 	int					owner;
 	long				available_at;
 	int					stopped;
