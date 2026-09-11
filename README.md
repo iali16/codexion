@@ -367,7 +367,7 @@ deadline = last_compile_start + time_to_burnout
 
 The coder with the earliest deadline is served first.
 
-If two EDF deadlines are equal, the implementation uses a deterministic tie-breaker: the higher coder number is preferred.
+If two EDF deadlines are equal, the implementation uses a deterministic tie-breaker: the lower coder number is preferred.
 
 This guarantees that dongle arbitration is not left to arbitrary thread scheduling.
 
