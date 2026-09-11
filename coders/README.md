@@ -52,7 +52,7 @@ The project demonstrates:
 - **FIFO (First In, First Out)**: Coders acquire dongles in order of request
 - **EDF (Earliest Deadline First)**: Coders with earlier deadlines get priority
 
-## 🚀 Getting Started
+## 🚀 Instructions
 
 ### Prerequisites
 
@@ -241,20 +241,7 @@ codexion/
 
 ### Coding Standards
 
-The project follows strict **C89** standard with **Norminette** compliance:
-
-| Rule | Description |
-|------|-------------|
-| **Function Length** | Max 25 lines (not counting braces) |
-| **Variables** | Max 5 per function |
-| **Parameters** | Max 4 per function |
-| **Indentation** | Tabs only (no spaces) |
-| **Comments** | `/* */` style only (no `//`) |
-| **No Ternaries** | Use `if/else` instead of `? :` |
-| **No For Loops** | Use `while` loops instead |
-| **No Do-While** | Use `while` loops instead |
-| **Headers** | 42 header required at top of each file |
-| **Declarations** | Must be at top of block (C89 requirement) |
+The project follows strict **C89** standard with **Norminette** compliance.
 
 ### Compilation Flags
 
@@ -291,62 +278,469 @@ $(CC) $(CFLAGS) -o codexion main.o output.o ...
 | `fclean` | Remove object files and executable |
 | `re` | Rebuild everything (fclean + all) |
 
-## 🔧 Troubleshooting
-
-### Common Issues
-
-| Issue | Solution |
-|-------|----------|
-| `command not found: make` | Install build-essential: `sudo apt install build-essential` |
-| `pthread not found` | Install pthread: `sudo apt install libpthread-stubs0-dev` |
-| `codexion.h: No such file or directory` | Ensure `-Iinc` flag is in CFLAGS |
-| Compilation errors with C89 | No `//` comments, declarations at top of blocks |
-| Valgrind errors | Check for data races with `--tool=helgrind` |
-| Norminette errors | Run `norminette` and fix reported issues |
-
-### Debug Build
-
-```bash
-make CFLAGS="-Wall -Wextra -pthread -std=c89 -pedantic -g -Iinc"
-```
-
-### Testing Different Schedulers
-
-```bash
-# Compare FIFO and EDF outputs
-./codexion 10 200 100 50 30 3 10 fifo > fifo_output.txt
-./codexion 10 200 100 50 30 3 10 edf > edf_output.txt
-diff fifo_output.txt edf_output.txt
-```
-
 ## 📊 Performance
 
 ### Time Complexity
 
 | Operation | Complexity |
 |-----------|------------|
-| Dongle acquisition | O(log N) |
-| Dongle release | O(log N) |
-| Heap push | O(log N) |
-| Heap remove | O(log N) |
-| Coder cycle | O(N) for completion check |
+| Dongle acquisition | O(log n) |
+| Dongle release | O(log n) |
+| Heap push | O(log n) |
+| Heap remove | O(log n) |
+| Coder cycle | O(n) for completion check |
 
 ### Space Complexity
 
 | Component | Memory Usage |
 |-----------|--------------|
-| Dongles | O(N) |
-| Coders | O(N) |
-| Heap | O(N) |
-| Total | O(N) |
+| Dongles | O(n) |
+| Coders | O(n) |
+| Heap | O(n) |
+| Total | O(n) |
 
 ### Performance Considerations
 
-- **Memory Usage**: O(N) for dongles and coders
+- **Memory Usage**: O(n) for dongles and coders
 - **Thread Safety**: Mutex locks for all shared data
 - **Scalability**: Handles up to INT_MAX coders (practical limit depends on system)
 - **Bottleneck**: Heap operations are the main performance factor
 - **Optimization**: EDF scheduling requires additional comparisons
+
+
+## 🚫 Blocking cases handled
+
+This section describes the main concurrency issues handled by the implementation.
+
+### ↘️ Deadlock prevention and Coffman’s conditions
+
+Deadlock is prevented by breaking the circular-wait condition.
+
+Each dongle has a fixed numeric identifier. When a coder needs two dongles, the coder always requests them in the same global order:
+
+1. the lower-numbered dongle is requested first,
+2. the higher-numbered dongle is requested second,
+3. both dongles are released after compiling.
+
+Because all coders follow the same acquisition order, a circular dependency between coders and dongles cannot form.
+
+This can be explained using Coffman’s conditions:
+
+***Mutual exclusion:***
+Each dongle is protected by its own mutex. Only one coder can own a dongle at a time.
+
+***Hold and wait:***
+A coder may hold one dongle while waiting for the second one. However, this cannot produce a circular wait because dongles are always acquired in the same global order.
+
+***No preemption:***
+Dongles are not taken by force. A coder releases dongles voluntarily after compiling.
+
+***Circular wait:***
+Circular wait is eliminated by the fixed dongle acquisition order. Since no coder can hold a higher-numbered dongle while waiting for a lower-numbered one, a deadlock cycle cannot occur.
+
+---
+
+### ↘️ Starvation prevention
+
+Each dongle maintains a waiting queue implemented as a binary heap.
+
+When multiple coders request the same dongle, the dongle grants access according to the selected scheduler.
+
+***FIFO:***
+With FIFO, the heap orders waiters by arrival sequence. The request that arrived first is served first.
+
+***EDF:***
+With EDF, the heap orders waiters by burnout deadline:
+
+```text
+deadline = last_compile_start + time_to_burnout
+```
+
+The coder with the earliest deadline is served first.
+
+If two EDF deadlines are equal, the implementation uses a deterministic tie-breaker: the higher coder number is preferred.
+
+This guarantees that dongle arbitration is not left to arbitrary thread scheduling.
+
+---
+
+### ↘️ Dongle cooldown handling
+
+After a dongle is released, it cannot be reused immediately.
+
+Each dongle stores a timestamp representing when it becomes available again:
+
+```text
+available_at = current_time + dongle_cooldown
+```
+
+A waiter can take the dongle only when:
+
+```text
+current_time >= available_at
+```
+
+This ensures that the cooldown constraint is respected even under contention.
+
+The cooldown timestamp is protected by the dongle mutex, so no thread can read or modify it while another thread is updating the dongle state.
+
+---
+
+### ↘️ Burnout detection
+
+A monitor thread checks burnout deadlines.
+
+Each coder has a burnout deadline:
+
+```text
+last_compile_start + time_to_burnout
+```
+
+If a coder has not started compiling before that deadline, the monitor detects the burnout and stops the simulation.
+
+The monitor checks the shared state frequently enough to respect the required precision:
+
+> The burnout message must be displayed within 10 ms of the actual burnout time.
+
+The monitor does not rely on coders communicating with each other. It observes protected shared state and stops the simulation when a burnout condition is detected.
+
+---
+
+### ↘️ Log serialization
+
+All state-change messages are printed through a single logging function.
+
+This function uses a dedicated log mutex so that two threads can never write at the same time. This prevents interleaved or partially mixed log lines.
+
+The logger produces messages in the required format:
+
+```text
+timestamp_in_ms X has taken a dongle
+timestamp_in_ms X is compiling
+timestamp_in_ms X is debugging
+timestamp_in_ms X is refactoring
+timestamp_in_ms X burned out
+```
+
+Log serialization guarantees that each displayed message remains atomic with respect to other threads.
+
+---
+
+## 🚦 Thread synchronization mechanisms
+
+This project uses POSIX threading primitives and a custom waiting/event mechanism built from protected shared state.
+
+The main synchronization tools are:
+
+- `pthread_mutex_t`
+- `pthread_cond_t`
+- a custom event/waiting implementation based on protected state, condition variables, and heap-based waiting queues
+
+No global mutable variables are used. All shared state is stored inside structures passed explicitly to threads.
+
+---
+
+### `pthread_mutex_t`
+
+Mutexes protect every piece of shared mutable state.
+
+#### Dongle mutex
+
+Each dongle has its own mutex.
+
+The dongle mutex protects:
+- the current dongle owner,
+- the cooldown timestamp,
+- the waiting queue,
+- the stopped state of the dongle.
+
+Any operation that reads or modifies the dongle state is performed while holding that dongle’s mutex.
+
+Example pattern:
+
+```c
+pthread_mutex_lock(&dongle->lock);
+
+if (dongle_is_available(dongle))
+    grant_dongle_to_waiter(dongle, waiter);
+
+pthread_mutex_unlock(&dongle->lock);
+```
+
+This prevents two coders from taking the same dongle at the same time.
+
+---
+
+#### Simulation state mutex
+
+A simulation mutex protects shared simulation state, including:
+
+- whether the simulation is still running,
+- coder states,
+- compile counters,
+- last compile start times,
+- burnout information.
+
+Coders update their state under this mutex. The monitor reads coder state under the same mutex.
+
+Example:
+
+```c
+pthread_mutex_lock(&sim->lock);
+
+coder->last_compile_start = current_time;
+coder->state = STATE_COMPILING;
+
+pthread_mutex_unlock(&sim->lock);
+```
+
+This prevents a race between a coder updating its state and the monitor checking burnout deadlines.
+
+---
+
+#### Log mutex
+
+A separate mutex protects logging.
+
+Every log message is written while holding the log mutex. This ensures that messages are not interleaved.
+
+Example:
+
+```c
+pthread_mutex_lock(&sim->log_lock);
+
+write_log_message(...);
+
+pthread_mutex_unlock(&sim->log_lock);
+```
+
+This guarantees that each log line is written atomically with respect to other threads.
+
+---
+
+### `pthread_cond_t`
+
+Each dongle also has a condition variable.
+
+The condition variable is used when a coder cannot immediately take a dongle. The coder waits on the dongle’s condition variable while still holding the dongle mutex.
+
+This is important because `pthread_cond_wait()` and `pthread_cond_timedwait()` atomically release the mutex and put the thread to sleep. When the thread wakes up, it reacquires the same mutex before continuing.
+
+Example pattern:
+
+```c
+pthread_mutex_lock(&dongle->lock);
+
+while (!dongle_can_be_granted(dongle, waiter))
+    pthread_cond_timedwait(&dongle->cond, &dongle->lock, &timeout);
+
+if (dongle_can_be_granted(dongle, waiter))
+    grant_dongle_to_waiter(dongle, waiter);
+
+pthread_mutex_unlock(&dongle->lock);
+```
+
+This prevents the following race condition:
+
+1. Thread A checks whether the dongle is available.
+2. Thread B changes the dongle state.
+3. Thread A waits using outdated information.
+
+Because the check and the wait happen while holding the mutex, the state cannot change between the check and the wait.
+
+---
+
+### Custom event implementation
+
+The project does not use an external event library. Instead, events are implemented using a combination of:
+
+- protected state,
+- mutexes,
+- condition variables,
+- heap-based waiting queues.
+
+The main events are:
+
+- dongle released,
+- dongle cooldown expired,
+- simulation stopped,
+- burnout detected,
+- required number of compiles reached.
+
+These events are not represented by unsynchronized shared flags. They are represented by state changes inside mutex-protected structures.
+
+For example:
+
+- when a dongle is released, its state is updated under its mutex and waiting threads are notified,
+- when the monitor detects burnout, the simulation state is marked as stopped under the simulation mutex,
+- when the simulation stops, dongles are marked as stopped under their own mutexes,
+- coder threads observe these protected state changes and exit cleanly.
+
+This design avoids busy waiting and provides safe thread communication.
+
+---
+
+### Coordination of shared resources
+
+#### Dongles
+
+Dongles are the main shared resource.
+
+Each dongle has:
+
+- a mutex,
+- a condition variable,
+- an owner,
+- a cooldown timestamp,
+- a priority queue of waiting coders.
+
+All access to these fields is synchronized.
+
+This ensures:
+
+- no duplicate dongle usage,
+- correct cooldown behavior,
+- fair arbitration between waiting coders,
+- safe wake-up when the dongle becomes available.
+
+---
+
+#### Logging
+
+Logging is a shared output resource.
+
+If two threads printed at the same time, their messages could become mixed. To prevent this, all logs go through one serialized logging function protected by a mutex.
+
+This ensures that the output always remains well-formed and readable.
+
+---
+
+#### Monitor state
+
+The monitor thread must observe coder state without introducing race conditions.
+
+Coders publish their state by updating protected fields:
+
+- current state,
+- last compile start time,
+- compile count.
+
+The monitor reads those fields using the same simulation mutex.
+
+This gives the monitor a consistent view of the simulation without requiring direct communication between coders.
+
+---
+
+### Examples of race-condition prevention
+
+#### Example 1: protecting dongle ownership
+
+Without synchronization, two coders could believe they own the same dongle.
+
+With synchronization:
+
+```c
+pthread_mutex_lock(&dongle->lock);
+
+if (dongle->owner == -1 && current_time >= dongle->available_at)
+{
+    dongle->owner = coder_id;
+}
+
+pthread_mutex_unlock(&dongle->lock);
+```
+
+Only one thread can execute this critical section at a time, so the owner field cannot be corrupted.
+
+---
+
+#### Example 2: protecting burnout state
+
+Without synchronization, the monitor could read a coder’s state while a coder is updating it.
+
+With synchronization:
+
+```c
+pthread_mutex_lock(&sim->lock);
+
+coder->state = STATE_COMPILING;
+coder->last_compile_start = now_ms();
+
+pthread_mutex_unlock(&sim->lock);
+```
+
+The monitor also uses:
+
+```c
+pthread_mutex_lock(&sim->lock);
+
+check_all_coder_deadlines(sim);
+
+pthread_mutex_unlock(&sim->lock);
+```
+
+This prevents inconsistent observations.
+
+---
+
+#### Example 3: protecting logs
+
+Without synchronization, two threads could write simultaneously and produce mixed output.
+
+With a log mutex, each line is written completely before another thread can write.
+
+This guarantees that messages such as:
+
+```text
+12 3 is compiling
+```
+
+are never mixed with other messages.
+
+---
+
+### Thread-safe communication between coders and the monitor
+
+Coders do not communicate directly with each other. They also do not send direct messages to the monitor.
+
+Instead, communication happens through protected shared state.
+
+#### Coder to monitor communication
+
+When a coder starts compiling, it updates its state:
+
+```c
+pthread_mutex_lock(&sim->lock);
+
+coder->state = STATE_COMPILING;
+coder->last_compile_start = current_time;
+
+pthread_mutex_unlock(&sim->lock);
+```
+
+The monitor later reads this state under the same mutex.
+
+This allows the monitor to know whether the coder has started compiling before the burnout deadline.
+
+---
+
+#### Monitor to coder communication
+
+When the monitor detects burnout, it stops the simulation:
+
+```c
+pthread_mutex_lock(&sim->lock);
+
+sim->running = 0;
+
+pthread_mutex_unlock(&sim->lock);
+```
+
+Then the dongles are marked as stopped under their own mutexes.
+
+Coder threads observe the stopped state through synchronized checks and exit cleanly.
+
+This provides safe communication without requiring coders to share information directly.
 
 ## 🗂️ Resources
 
@@ -354,28 +748,8 @@ diff fifo_output.txt edf_output.txt
 
 - POSIX Threads overview:
   https://man7.org/linux/man-pages/man7/pthreads.7.html
-- pthread_create:
-  https://pubs.opengroup.org/onlinepubs/9699919799/functions/pthread_create.html
-- pthread_join:
-  https://pubs.opengroup.org/onlinepubs/9699919799/functions/pthread_join.html
-- pthread_mutex_init:
-  https://pubs.opengroup.org/onlinepubs/9699919799/functions/pthread_mutex_init.html
-- pthread_cond_wait:
-  https://pubs.opengroup.org/onlinepubs/9699919799/functions/pthread_cond_wait.html
-- pthread_cond_timedwait:
-  https://pubs.opengroup.org/onlinepubs/9699919799/functions/pthread_cond_timedwait.html
-- pthread_cond_broadcast:
-  https://pubs.opengroup.org/onlinepubs/9699919799/functions/pthread_cond_broadcast.html
-- gettimeofday:
-  https://pubs.opengroup.org/onlinepubs/9699919799/functions/gettimeofday.html
-- usleep:
-  https://pubs.opengroup.org/onlinepubs/9699919799/functions/usleep.html
-- write:
-  https://pubs.opengroup.org/onlinepubs/9699919799/functions/write.html
-- malloc:
-  https://pubs.opengroup.org/onlinepubs/9699919799/functions/malloc.html
-- free:
-  https://pubs.opengroup.org/onlinepubs/9699919799/functions/free.html
+- pthread_create, _join, _mutex_init, cond_wait, _cond_timedwait, _cond_broadcast, _gettimeofday, _usleep:
+  https://pubs.opengroup.org/onlinepubs/9699919799/functions/
 
 ### Concurrency theory
 
@@ -394,27 +768,13 @@ diff fifo_output.txt edf_output.txt
 - Priority queue:
   https://en.wikipedia.org/wiki/Priority_queue
 
-### Debugging tools
-
-- Valgrind:
-  https://valgrind.org/docs/manual/
-- Valgrind Memcheck:
-  https://valgrind.org/docs/manual/mc-manual.html
-- Valgrind Helgrind:
-  https://valgrind.org/docs/manual/hg-manual.html
-- ThreadSanitizer:
-  https://clang.llvm.org/docs/ThreadSanitizer.html
-
 ### AI usage
 
 AI was used to assist with:
 
-- brainstorming the overall architecture,
-- understanding how to model dongles, coders, and waiting queues,
-- reviewing possible deadlock and data-race scenarios,
-- designing the FIFO/EDF heap comparator,
-- preparing test cases,
-- structuring the README,
-- preparing for peer evaluation and live coding.
+- understanding how to model dongles, coders, and waiting queues
+- reviewing possible deadlock and data-race scenarios
+- preparing test cases
+- structuring the README
 
 All AI-assisted code and explanations were reviewed, tested, and discussed with peers before submission. The final implementation was verified to ensure compliance with the subject constraints.

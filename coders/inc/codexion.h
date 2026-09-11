@@ -6,7 +6,7 @@
 /*   By: drakotov <drakotov@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/08/19 00:10:10 by drakotov          #+#    #+#             */
-/*   Updated: 2026/08/19 04:17:28 by drakotov         ###   ########.fr       */
+/*   Updated: 2026/09/11 03:01:59 by drakotov         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -139,5 +139,10 @@ void					*monitor_routine(void *arg);
 
 int						init_sim(t_sim *sim);
 void					cleanup_sim(t_sim *sim);
+
+int						waiter_less(t_sched sched, t_waiter *a, t_waiter *b);
+void					heap_push(t_dongle *d, t_waiter *w);
+int						heap_remove(t_dongle *d, t_waiter *w);
+t_waiter				*heap_peek_top(t_dongle *d);
 
 #endif
