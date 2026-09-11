@@ -109,7 +109,6 @@ struct					s_sim
 	long				seq_counter;
 };
 
-
 void					put_string(const char *s);
 void					put_number(long n);
 
@@ -125,8 +124,7 @@ int						sleep_ms(t_sim *sim, long ms);
 int						sim_get_stop_flag(t_sim *sim);
 void					sim_set_stop(t_sim *sim);
 
-int						dongle_init(t_dongle *d, int id, int capacity,
-							t_sched sched, long start);
+int						dongle_init(t_dongle *d, t_sim *sim, int id);
 void					dongle_destroy(t_dongle *d);
 void					dongle_release(t_sim *sim, t_dongle *d);
 int						dongle_acquire(t_sim *sim, t_dongle *d, t_waiter *w);
@@ -137,12 +135,22 @@ void					coder_release_two(t_sim *sim, t_coder *coder, int first,
 							int second);
 int						coder_acquire_two(t_sim *sim, t_coder *coder,
 							int *first, int *second);
+void					coder_compile(t_sim *sim, t_coder *coder, int first,
+							int second);
+int						coder_after_compile(t_sim *sim, t_coder *coder);
+int						coder_debug(t_sim *sim, t_coder *coder);
 void					*coder_routine(void *arg);
 
 void					*monitor_routine(void *arg);
+int						find_burned_coder(t_sim *sim);
+int						all_done(t_sim *sim);
 
 int						init_sim(t_sim *sim);
 void					cleanup_sim(t_sim *sim);
+
+int						create_threads(t_sim *sim, int *created);
+void					stop_on_error(t_sim *sim);
+void					wait_threads(t_sim *sim, int created);
 
 int						waiter_less(t_sched sched, t_waiter *a, t_waiter *b);
 void					heap_push(t_dongle *d, t_waiter *w);

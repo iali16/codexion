@@ -22,12 +22,28 @@ void	put_string(const char *s)
 	(void)write(1, s, len);
 }
 
+static void	put_unsigned(unsigned long mag)
+{
+	char	buf[32];
+	int		i;
+
+	i = 0;
+	while (mag > 0 && i < 31)
+	{
+		buf[i] = '0' + (mag % 10);
+		mag /= 10;
+		i++;
+	}
+	while (i > 0)
+	{
+		i--;
+		(void)write(1, &buf[i], 1);
+	}
+}
+
 void	put_number(long n)
 {
-	char			buf[32];
 	unsigned long	mag;
-	int				i;
-	char			c;
 
 	if (n == 0)
 	{
@@ -41,15 +57,5 @@ void	put_number(long n)
 	}
 	else
 		mag = (unsigned long)n;
-	i = 0;
-	while (mag > 0 && i < 31)
-	{
-		buf[i++] = '0' + (mag % 10);
-		mag /= 10;
-	}
-	while (i > 0)
-	{
-		c = buf[--i];
-		(void)write(1, &c, 1);
-	}
+	put_unsigned(mag);
 }

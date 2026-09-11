@@ -4,15 +4,26 @@
 /*   sim_utils.c                                        :+:      :+:    :+:   */
 /*                                                    +:+ +:+         +:+     */
 /*   By: drakotov <drakotov@student.42.fr>          +#+  +:+       +#+        */
-/*                                                +#+#+#+#+#+   +#+           */
+/*                                                +#+#+#+#+#+ +#+           */
 /*   Created: 2026/08/19 02:27:18 by drakotov          #+#    #+#             */
-/*   Updated: 2026/08/19 02:27:20 by drakotov         ###   ########.fr       */
+/*   Updated: 2026/09/11 12:00:00 by drakotov         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
 #include "codexion.h"
 
-int	init_sim(t_sim *sim)
+static void	destroy_dongles(t_sim *sim, int count)
+{
+	while (count > 0)
+	{
+		count--;
+		dongle_destroy(&sim->dongles[count]);
+	}
+	free(sim->dongles);
+	sim->dongles = NULL;
+}
+
+static int	init_dongles(t_sim *sim)
 {
 	int	i;
 
@@ -20,33 +31,23 @@ int	init_sim(t_sim *sim)
 	if (!sim->dongles)
 		return (0);
 	memset(sim->dongles, 0, sizeof(t_dongle) * sim->n);
-	sim->coders = malloc(sizeof(t_coder) * sim->n);
-	if (!sim->coders)
-	{
-		free(sim->dongles);
-		sim->dongles = NULL;
-		return (0);
-	}
-	memset(sim->coders, 0, sizeof(t_coder) * sim->n);
 	i = 0;
 	while (i < sim->n)
 	{
-		if (!dongle_init(&sim->dongles[i], i, sim->n, sim->sched,
-				sim->start))
+		if (!dongle_init(&sim->dongles[i], sim, i))
 		{
-			while (i > 0)
-			{
-				i--;
-				dongle_destroy(&sim->dongles[i]);
-			}
-			free(sim->dongles);
-			free(sim->coders);
-			sim->dongles = NULL;
-			sim->coders = NULL;
+			destroy_dongles(sim, i);
 			return (0);
 		}
 		i++;
 	}
+	return (1);
+}
+
+static void	init_coders(t_sim *sim)
+{
+	int	i;
+
 	i = 0;
 	while (i < sim->n)
 	{
@@ -58,6 +59,21 @@ int	init_sim(t_sim *sim)
 		sim->coders[i].sim = sim;
 		i++;
 	}
+}
+
+int	init_sim(t_sim *sim)
+{
+	sim->coders = malloc(sizeof(t_coder) * sim->n);
+	if (!sim->coders)
+		return (0);
+	memset(sim->coders, 0, sizeof(t_coder) * sim->n);
+	if (!init_dongles(sim))
+	{
+		free(sim->coders);
+		sim->coders = NULL;
+		return (0);
+	}
+	init_coders(sim);
 	return (1);
 }
 
@@ -83,45 +99,4 @@ void	cleanup_sim(t_sim *sim)
 	}
 	pthread_mutex_destroy(&sim->lock);
 	pthread_mutex_destroy(&sim->log_lock);
-}
-
-int	sim_get_stop_flag(t_sim *sim)
-{
-	int	flag;
-
-	pthread_mutex_lock(&sim->lock);
-	flag = sim->stop_flag;
-	pthread_mutex_unlock(&sim->lock);
-	return (flag);
-}
-
-void	sim_set_stop(t_sim *sim)
-{
-	pthread_mutex_lock(&sim->lock);
-	sim->running = 0;
-	sim->stop_flag = 1;
-	pthread_mutex_unlock(&sim->lock);
-}
-
-int	sim_is_running(t_sim *sim)
-{
-	int	running;
-
-	pthread_mutex_lock(&sim->lock);
-	running = sim->running;
-	pthread_mutex_unlock(&sim->lock);
-	return (running);
-}
-
-int	sleep_ms(t_sim *sim, long ms)
-{
-	struct timespec	ts;
-
-	ms_to_timespec(ms, &ts);
-	while (nanosleep(&ts, &ts) == -1 && errno == EINTR)
-	{
-		if (!sim_is_running(sim))
-			return (-1);
-	}
-	return (0);
 }

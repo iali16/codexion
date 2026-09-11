@@ -4,27 +4,26 @@
 /*   dongle.c                                           :+:      :+:    :+:   */
 /*                                                    +:+ +:+         +:+     */
 /*   By: drakotov <drakotov@student.42.fr>          +#+  +:+       +#+        */
-/*                                                +#+#+#+#+#+   +#+           */
+/*                                                +#+#+#+#+#+ +#+           */
 /*   Created: 2026/08/19 01:47:13 by drakotov          #+#    #+#             */
-/*   Updated: 2026/08/19 05:20:38 by drakotov         ###   ########.fr       */
+/*   Updated: 2026/09/11 12:00:00 by drakotov         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
 #include "codexion.h"
 
-int	dongle_init(t_dongle *d, int id, int capacity, t_sched sched,
-		long start)
+int	dongle_init(t_dongle *d, t_sim *sim, int id)
 {
-	d->heap = malloc(sizeof(t_waiter *) * capacity);
+	d->heap = malloc(sizeof(t_waiter *) * sim->n);
 	if (!d->heap)
 		return (0);
 	d->id = id;
 	d->owner = -1;
-	d->available_at = start;
+	d->available_at = sim->start;
 	d->stopped = 0;
 	d->size = 0;
-	d->capacity = capacity;
-	d->sched = sched;
+	d->capacity = sim->n;
+	d->sched = sim->sched;
 	if (pthread_mutex_init(&d->lock, NULL) != 0)
 		return (free(d->heap), 0);
 	if (sem_init(&d->wake_sem, 0, 0) != 0)
@@ -66,52 +65,4 @@ void	stop_dongles(t_sim *sim)
 		sem_post(&sim->dongles[i].wake_sem);
 		i++;
 	}
-}
-
-static int	try_acquire(t_sim *sim, t_dongle *d, t_waiter *w)
-{
-	long	current;
-
-	(void)sim;
-	current = now_ms();
-	if (d->size > 0 && d->heap[0] == w && d->owner == -1
-		&& current >= d->available_at)
-	{
-		heap_remove(d, w);
-		d->owner = w->coder_id;
-		return (1);
-	}
-	return (0);
-}
-
-int	dongle_acquire(t_sim *sim, t_dongle *d, t_waiter *w)
-{
-	struct timespec	ts;
-	int				ret;
-
-	pthread_mutex_lock(&d->lock);
-	if (d->stopped || sim_get_stop_flag(sim) || d->size >= d->capacity)
-	{
-		pthread_mutex_unlock(&d->lock);
-		return (-1);
-	}
-	heap_push(d, w);
-	while (!d->stopped && !sim_get_stop_flag(sim))
-	{
-		if (try_acquire(sim, d, w))
-		{
-			pthread_mutex_unlock(&d->lock);
-			return (0);
-		}
-		pthread_mutex_unlock(&d->lock);
-		ms_to_timespec(now_ms() + 1, &ts);
-		ret = sem_timedwait(&d->wake_sem, &ts);
-		pthread_mutex_lock(&d->lock);
-		if (ret != 0)
-			continue ;
-	}
-	if (w->in_heap)
-		heap_remove(d, w);
-	pthread_mutex_unlock(&d->lock);
-	return (-1);
 }
