@@ -24,9 +24,10 @@ void	put_string(const char *s)
 
 void	put_number(long n)
 {
-	char	buf[32];
-	int		i;
-	char	c;
+	char			buf[32];
+	unsigned long	mag;
+	int				i;
+	char			c;
 
 	if (n == 0)
 	{
@@ -36,13 +37,15 @@ void	put_number(long n)
 	if (n < 0)
 	{
 		(void)write(1, "-", 1);
-		n = -n;
+		mag = (unsigned long)(-(n + 1)) + 1;
 	}
+	else
+		mag = (unsigned long)n;
 	i = 0;
-	while (n > 0 && i < 31)
+	while (mag > 0 && i < 31)
 	{
-		buf[i++] = '0' + (n % 10);
-		n /= 10;
+		buf[i++] = '0' + (mag % 10);
+		mag /= 10;
 	}
 	while (i > 0)
 	{

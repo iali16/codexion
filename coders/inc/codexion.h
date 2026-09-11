@@ -23,6 +23,7 @@
 # include <sys/time.h>
 # include <time.h>
 # include <unistd.h>
+# include <errno.h>
 
 typedef struct s_args
 {
@@ -120,6 +121,8 @@ int						parse_args(int argc, char **argv, t_sim *sim);
 
 int						sim_is_running(t_sim *sim);
 int						sleep_ms(t_sim *sim, long ms);
+int						sim_get_stop_flag(t_sim *sim);
+void					sim_set_stop(t_sim *sim);
 
 int						dongle_init(t_dongle *d, int id, int capacity,
 							t_sched sched, long start);

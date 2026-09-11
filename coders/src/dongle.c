@@ -72,6 +72,7 @@ static int	try_acquire(t_sim *sim, t_dongle *d, t_waiter *w)
 {
 	long	current;
 
+	(void)sim;
 	current = now_ms();
 	if (d->size > 0 && d->heap[0] == w && d->owner == -1
 		&& current >= d->available_at)

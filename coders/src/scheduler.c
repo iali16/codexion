@@ -16,27 +16,60 @@ int	waiter_less(t_sched sched, t_waiter *a, t_waiter *b)
 {
 	if (sched == SCHED_EDF_CUSTOM)
 	{
-		if (a->deadline < b->deadline);
+		if (a->deadline != b->deadline)
 			return (a->deadline < b->deadline);
 		return (a->seq < b->seq);
 	}
 	return (a->seq < b->seq);
 }
 
+static void	heap_swap(t_dongle *d, int a, int b)
+{
+	t_waiter	*tmp;
+
+	tmp = d->heap[a];
+	d->heap[a] = d->heap[b];
+	d->heap[b] = tmp;
+}
+
+static void	heap_sift_down(t_dongle *d, int i)
+{
+	int	left;
+	int	right;
+	int	smallest;
+
+	while (1)
+	{
+		left = 2 * i + 1;
+		right = 2 * i + 2;
+		smallest = i;
+		if (left < d->size
+			&& waiter_less(d->sched, d->heap[left], d->heap[smallest]))
+			smallest = left;
+		if (right < d->size
+			&& waiter_less(d->sched, d->heap[right], d->heap[smallest]))
+			smallest = right;
+		if (smallest == i)
+			break ;
+		heap_swap(d, i, smallest);
+		i = smallest;
+	}
+}
+
 static void	heap_sift_up(t_dongle *d, int i)
 {
-	int 	parent;
+	int		parent;
 
 	while (i > 0)
 	{
 		parent = (i - 1) / 2;
-		if (waiter_less(d->sched, d->heap[i]), d->heap[parent])
+		if (waiter_less(d->sched, d->heap[i], d->heap[parent]))
 		{
 			heap_swap(d, i, parent);
 			i = parent;
 		}
 		else
-			break
+			break ;
 	}
 }
 
@@ -74,9 +107,9 @@ int	heap_remove(t_dongle *d, t_waiter *w)
 	return (1);
 }
 
-t_waiter	*heap_peak_top(t_dongle *d)
+t_waiter	*heap_peek_top(t_dongle *d)
 {
 	if (d->size == 0)
-		return NULL;
+		return (NULL);
 	return (d->heap[0]);
 }
