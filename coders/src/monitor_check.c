@@ -17,7 +17,7 @@ static int	is_burned_out(t_sim *sim, t_coder *c)
 	long	now;
 
 	now = now_ms();
-	if (c->state != STATE_WAITING)
+	if (c->state == STATE_COMPILING)
 		return (0);
 	if (now - c->last_compile_start >= sim->burnout)
 		return (1);
